@@ -11,10 +11,10 @@ logging.basicConfig(
 logging.propagate = False
 
 
-class Spreadfy:
+class Extractable:
     def __init__(
         self,
-        data_directory="data-test/",
+        data_directory="data/",
         data_extensions=(".xlsx", ".xls"),
         result_filename="result.xlsx",
         subtable_header_id=None,
