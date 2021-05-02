@@ -11,3 +11,12 @@ extractable = Extractable(
 )
 extractable.call()
 ```
+
+## Example
+Running the [example.py](example.py) script will result in the table shown below.
+
+| |  |
+| - | - |
+| **File 1** | ![alt text](example/preview-data1.png) |
+| **File 2** | ![alt text](example/preview-data2.png) |
+| **Result** | ![alt text](example/preview-result.png) |
