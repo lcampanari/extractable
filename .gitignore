@@ -1,4 +1,6 @@
 *.xlsx
+*.log
+
+.vscode
 data/
 data-test/
-*.log
