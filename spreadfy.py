@@ -1,12 +1,23 @@
 import os
 import pandas as pd
+import logging
 
-DATA_DIR = "data/"
+DATA_DIR = "data-test/"
 DATA_EXTENSIONS = (".xlsx", ".xls")
 
 DEFAULT_FILE_NAME_RESULT = "data_result.xlsx"
 
 FOOD_ID_COL_NAME = "FoodCode"
+
+
+logging.basicConfig(
+    filename="logs.log",
+    format="%(asctime)s - %(levelname)s: %(message)s",
+    level=logging.DEBUG,
+    datefmt="%m/%d/%Y %I:%M:%S %p",
+)
+
+logging.propagate = False
 
 
 class Spreadfy:
@@ -21,6 +32,7 @@ class Spreadfy:
         self.result_filename = result_filename
         self.remove_header = remove_header
         self.sub_table_header_id = sub_table_header_id
+        self.total_tables_extracted = 0
 
     def process_directory(self, directory=DATA_DIR):
         dfs = []
@@ -30,10 +42,10 @@ class Spreadfy:
                 filename = os.path.join(subdir, file)
 
                 if not self.is_file_allowed(file):
-                    print(f"Skipping {filename}")
+                    logging.warning(
+                        f"Skipping {filename} because the file type is not one of the following: {DATA_EXTENSIONS}"
+                    )
                     continue
-
-                print(f"Processing {filename}")
 
                 result = self.process_subtables(filename)
                 # result = self.process_file(filename)
@@ -61,11 +73,13 @@ class Spreadfy:
 
     def process_subtables(self, filename):
         df = pd.read_excel(filename, header=None)
+        file_rows = df.iterrows()
+        file_rows_length = len(list(df.iterrows()))
         rows = []
         tables = []
         dfs = []
 
-        for index, row in df.iterrows():
+        for index, row in file_rows:
             if self.is_empty(row):
                 continue
 
@@ -81,12 +95,29 @@ class Spreadfy:
             elif len(rows) > 0:
                 rows.append(row)
 
+                # in case there's only one table in the file
+                if index == file_rows_length - 1:
+                    tables.append(rows)
+
         for rows in tables:
             columns = rows.pop(0)
             df = pd.DataFrame(rows, columns=columns)
-            df.dropna(inplace=True, how="all", axis=1)
-            df.loc[0, FOOD_ID_COL_NAME] = df[FOOD_ID_COL_NAME].values[1]
+            df = df.dropna(how="all", axis=1)
+
+            # remove rows that contain "(g)" in the H2O column
+            if "H2O" in df:
+                df = df.drop(df[df["H2O"] == "(g)"].index)
+                df.loc[1, FOOD_ID_COL_NAME] = df[FOOD_ID_COL_NAME].values[2]
+            else:
+                df.loc[0, FOOD_ID_COL_NAME] = df[FOOD_ID_COL_NAME].values[1]
+
             dfs.append(df)
+
+        tables_length = len(tables)
+        self.total_tables_extracted += tables_length
+
+        logging.info(f"Processed {filename}:")
+        logging.info(f"  - {tables_length} table(s) extracted")
 
         return dfs
 
@@ -114,8 +145,13 @@ class Spreadfy:
     def call(self):
         dfs = self.process_directory()
         df = self.merge_dataframes(dfs)
-        print(df)
+
+        logging.info(
+            f"Extraction completed! Total of {self.total_tables_extracted} tables extracted."
+        )
+        logging.info(f"Writing to {self.result_filename}")
         df.to_excel(self.result_filename)
+        logging.info(f"Done!\n")
 
 
 class SpreadfyModeRaw(Spreadfy):
