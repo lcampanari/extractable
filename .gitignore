@@ -1,8 +1,10 @@
 *.xlsx
 *.log
 
-!example-result.xlsx
-
 .vscode
-data/
+data
 data-test/
+
+!example-result.xlsx
+!example/data/
+!example/data/*.xlsx
