@@ -2,22 +2,27 @@ import os
 import pandas as pd
 import logging
 
-DATA_DIR = "data-test/"
-DATA_EXTENSIONS = (".xlsx", ".xls")
-
-DEFAULT_FILE_NAME_RESULT = "data_result.xlsx"
-
-FOOD_ID_COL_NAME = "FoodCode"
-
-
 logging.basicConfig(
     filename="logs.log",
     format="%(asctime)s - %(levelname)s: %(message)s",
     level=logging.DEBUG,
     datefmt="%m/%d/%Y %I:%M:%S %p",
 )
-
 logging.propagate = False
+
+
+DATA_DIR = "data/"
+DATA_EXTENSIONS = (".xlsx", ".xls")
+
+DEFAULT_FILE_NAME_RESULT = "data_result.xlsx"
+
+FOOD_ID_COL_NAME = "FoodCode"
+
+COL_RENAME_MAPPING = {
+    "ModCode": ["ModCOode", "ModCOde", "Modcode"],
+    "RawWeight": ["Raw Weight"],
+    "FinalWeight": ["Final Weight"],
+}
 
 
 class Spreadfy:
@@ -102,14 +107,31 @@ class Spreadfy:
         for rows in tables:
             columns = rows.pop(0)
             df = pd.DataFrame(rows, columns=columns)
-            df = df.dropna(how="all", axis=1)
 
+            # Fix typos on column name
+            # for correct_name in COL_RENAME_MAPPING:
+            #     for wrong_name in COL_RENAME_MAPPING[correct_name]:
+            #         if wrong_name in df:
+            #             df = df.rename(columns=dict([(wrong_name, correct_name)]))
+
+            # copy 'id' to cell (0,0). H2O columns contain an extra row with the unit "(g)" below it
             # remove rows that contain "(g)" in the H2O column
+
             if "H2O" in df:
-                df = df.drop(df[df["H2O"] == "(g)"].index)
-                df.loc[1, FOOD_ID_COL_NAME] = df[FOOD_ID_COL_NAME].values[2]
+                extra_row_index = df[df["H2O"] == "(g)"].index
+                if not extra_row_index.empty:
+                    df.drop(extra_row_index, inplace=True)
+                    index_id_missing, index_id_value = 1, 2
+                else:
+                    index_id_missing, index_id_value = 0, 1
             else:
-                df.loc[0, FOOD_ID_COL_NAME] = df[FOOD_ID_COL_NAME].values[1]
+                index_id_missing, index_id_value = 0, 1
+
+            df.loc[index_id_missing, FOOD_ID_COL_NAME] = df[FOOD_ID_COL_NAME].values[
+                index_id_value
+            ]
+            # remove empty rows
+            df.dropna(how="all", axis=1, inplace=True)
 
             dfs.append(df)
 
@@ -139,13 +161,11 @@ class Spreadfy:
     def concatenate_raw_files(self, result_filename=None):
         dfs = self.process_directory()
         df = self.merge_dataframes(dfs)
-        print(df)
         df.to_excel(result_filename or self.result_filename)
 
     def call(self):
         dfs = self.process_directory()
         df = self.merge_dataframes(dfs)
-
         logging.info(
             f"Extraction completed! Total of {self.total_tables_extracted} tables extracted."
         )
@@ -197,49 +217,9 @@ def main():
     # spreadfy = Spreadfy()
     # spreadfy.concatenate_raw_files(result_filename="data_concatenated.xlsx")
     spreadfy = Spreadfy(
-        sub_table_header_id="FoodCode", result_filename="data_extracted.xlsx"
+        sub_table_header_id="FoodCode", result_filename="data_final.xlsx"
     )
     spreadfy.call()
 
 
 main()
-
-
-# print(df)
-
-# df.to_excel(FILE_NAME_RESULT)
-
-
-#%%
-# import pandas as pd
-# import itertools
-
-
-# def flatten(some_list):
-#     return [item for sublist in some_list for item in sublist]
-
-
-# headers = ["Col1", "Col2", "Col3", "Col4", "Col5"]
-# rows = [
-#     [21, 0.338911133303392, 0.0331906907949594, 0.97856589373232, 0.221503979880728],
-#     [21, 0.338911133303392, 0.0331906907949594, 0.97856589373232, 0.221503979880728],
-#     [21, 0.338911133303392, 0.0331906907949594, 0.97856589373232, 0.221503979880728],
-# ]
-
-# headers2 = ["Col1", "Col7", "Col2", "Col5", "Col3", "Col4", "Col6"]
-# rows2 = [
-#     [11, 22, 33, 44, 55, 66, 77],
-#     [11, 22, 33, 44, 55, 6525, "hello"],
-# ]
-
-# df1 = pd.DataFrame(rows, columns=headers)
-# df2 = pd.DataFrame(rows2, columns=headers2)
-
-# print(flatten(df1))
-
-# dfs = list(flatten([[df1], df2]))
-# print("normal", [df1, df2])
-# print("flat", dfs)
-
-# df = pd.concat(dfs, ignore_index=True, sort=False)
-# print(df)
